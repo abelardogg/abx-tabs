@@ -18,6 +18,7 @@ export function TrackPane({ pane }: { pane: number }) {
     fretShift,
     tuningShift,
     positionStore,
+    toggleLoopBar,
     registerPane,
     unregisterPane,
   } = useTabPlayer();
@@ -28,6 +29,7 @@ export function TrackPane({ pane }: { pane: number }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<AlphaTabApi | null>(null);
   const markerRef = useRef<HTMLDivElement>(null);
+  const surfaceRef = useRef<HTMLDivElement>(null);
   const renderedTrackRef = useRef<number | null>(null);
   const appliedFretRef = useRef<number | null>(null);
 
@@ -191,6 +193,38 @@ export function TrackPane({ pane }: { pane: number }) {
     };
   }, [loadedScore, trackIndex, fretShift, tuningShift, positionStore]);
 
+  /**
+   * Ctrl+clic marca el compás para el loop.
+   *
+   * Se resuelve el golpe a mano con `boundsLookup` en lugar de usar el evento
+   * `beatMouseDown` de alphaTab, porque ese no dice si había una tecla
+   * modificadora pulsada. Además hay que capturar el evento antes que
+   * alphaTab para que no reposicione la reproducción con el mismo clic.
+   */
+  useEffect(() => {
+    if (pane !== MASTER_PANE) return;
+    const surface = surfaceRef.current;
+    const api = apiRef.current;
+    if (!surface || !api || !loadedScore) return;
+
+    const onMouseDown = (event: MouseEvent) => {
+      if (!event.ctrlKey || event.button !== 0) return;
+      const lookup = api.boundsLookup;
+      if (!lookup) return;
+
+      const box = surface.getBoundingClientRect();
+      const beat = lookup.getBeatAtPos(event.clientX - box.left, event.clientY - box.top);
+      if (!beat) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      toggleLoopBar(beat.voice.bar.index);
+    };
+
+    surface.addEventListener('mousedown', onMouseDown, true);
+    return () => surface.removeEventListener('mousedown', onMouseDown, true);
+  }, [pane, loadedScore, toggleLoopBar]);
+
   const isActive = activePane === pane;
 
   return (
@@ -219,7 +253,7 @@ export function TrackPane({ pane }: { pane: number }) {
       </header>
 
       <div className="pane__viewport" ref={viewportRef} data-pane={pane}>
-        <div className="pane__surface">
+        <div className="pane__surface" ref={surfaceRef}>
           <div ref={mountRef} />
           {/* Se posiciona en coordenadas de la superficie de alphaTab, así que
               se desplaza junto con la partitura al hacer scroll. */}

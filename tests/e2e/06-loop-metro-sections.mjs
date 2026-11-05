@@ -49,8 +49,21 @@ const metroMsgs = msgs.filter(m => m.cmd === 'alphaSynth.setMetronomeVolume');
 const ciMsgs = msgs.filter(m => m.cmd === 'alphaSynth.setCountInVolume');
 console.log('  setMetronomeVolume:', JSON.stringify(metroMsgs.map(m => m.value)));
 console.log('  setCountInVolume:', JSON.stringify(ciMsgs.map(m => m.value)));
-check('llega metronomeVolume=1 al sintetizador', metroMsgs.some(m => m.value === '1'));
-check('llega countInVolume=1 al sintetizador', ciMsgs.some(m => m.value === '1'));
+// El volumen del metrónomo es configurable y arranca por encima de 1, porque
+// el click de alphaTab sale muy bajo frente a los instrumentos.
+const metroValues = metroMsgs.map(m => Number(m.value));
+check(
+  'llega un metronomeVolume > 1 al sintetizador',
+  metroValues.some(v => v > 1),
+  JSON.stringify(metroValues),
+);
+// El compás de entrada lo genera la app con Web Audio (clicks configurables),
+// así que el de alphaTab se deja siempre en silencio para que no se dupliquen.
+check(
+  'el compás de entrada de alphaTab queda en silencio',
+  ciMsgs.length === 0 || ciMsgs.every(m => Number(m.value) === 0),
+  JSON.stringify(ciMsgs.map(m => m.value)),
+);
 
 await page.locator('.transport__play').click();
 await page.waitForTimeout(3000);

@@ -10,6 +10,8 @@ import {
 import type { ReactNode } from 'react';
 import { AlphaTabApi, importer, model, synth } from '@coderline/alphatab';
 import { PositionStore } from './positionStore';
+import { startCountIn, type CountIn } from './countIn';
+import { PREF_KEYS, readBoolean, readNumber, write as writePref } from './preferences';
 import {
   clearRecentFile,
   hasReadPermission,
@@ -27,6 +29,14 @@ import { findSectionJump, readSections, type SectionMarker } from '../lib/sectio
 import { pitchedTracks, readTuning, type TuningInfo } from '../lib/tuning';
 
 export const MAX_PANES = 3;
+/**
+ * El click de alphaTab sale bastante más bajo que los instrumentos, y su
+ * volumen es una ganancia sin tope: por eso el valor de fábrica pasa de 1.
+ */
+export const DEFAULT_METRONOME_VOLUME = 2;
+export const MAX_METRONOME_VOLUME = 4;
+export const DEFAULT_COUNT_IN_BEATS = 4;
+export const MAX_COUNT_IN_BEATS = 16;
 /** El primer panel es siempre el que manda: es el único que sintetiza audio. */
 export const MASTER_PANE = 0;
 
@@ -118,8 +128,19 @@ export interface TabPlayerValue {
   // --- metrónomo ---
   metronome: boolean;
   setMetronome: (on: boolean) => void;
+  /** Ganancia del click; admite más de 1 porque de fábrica suena bajo. */
+  metronomeVolume: number;
+  setMetronomeVolume: (gain: number) => void;
   countIn: boolean;
   setCountIn: (on: boolean) => void;
+  /** Cuántos clicks suenan antes de arrancar. */
+  countInBeats: number;
+  setCountInBeats: (beats: number) => void;
+  /** Hay una cuenta atrás en curso. */
+  isCountingIn: boolean;
+  /** Fija el loop en un compás, o lo extiende desde el último marcado. */
+  toggleLoopBar: (barIndex: number) => void;
+  clearLoop: () => void;
 
   // --- internos usados por los paneles ---
   positionStore: PositionStore;
@@ -183,8 +204,18 @@ export function TabPlayerProvider({ children }: { children: ReactNode }) {
   const [tuningShift, setTuningShiftState] = useState(0);
   const [fretShift, setFretShiftState] = useState(0);
 
-  const [metronome, setMetronomeState] = useState(false);
-  const [countIn, setCountInState] = useState(false);
+  const [metronome, setMetronomeState] = useState(() =>
+    readBoolean(PREF_KEYS.metronome, false),
+  );
+  const [metronomeVolume, setMetronomeVolumeState] = useState(() =>
+    readNumber(PREF_KEYS.metronomeVolume, DEFAULT_METRONOME_VOLUME, 0, MAX_METRONOME_VOLUME),
+  );
+  const [countIn, setCountInState] = useState(() => readBoolean(PREF_KEYS.countIn, false));
+  const [countInBeats, setCountInBeatsState] = useState(() =>
+    readNumber(PREF_KEYS.countInBeats, DEFAULT_COUNT_IN_BEATS, 1, MAX_COUNT_IN_BEATS),
+  );
+  const [isCountingIn, setIsCountingIn] = useState(false);
+  const countInRef = useRef<CountIn | null>(null);
 
   const [recentName, setRecentName] = useState<string | null>(() => recentFileName());
   const [library, setLibrary] = useState<LibraryEntry[]>([]);
@@ -535,12 +566,45 @@ export function TabPlayerProvider({ children }: { children: ReactNode }) {
   // --- transporte ---
 
   const playPause = useCallback(() => {
-    master()?.playPause();
-  }, [master]);
+    const m = master();
+    if (!m) return;
+
+    // Si la cuenta atrás está sonando, esta pulsación la aborta.
+    if (countInRef.current) {
+      countInRef.current.cancel();
+      countInRef.current = null;
+      setIsCountingIn(false);
+      return;
+    }
+
+    const willStart = m.playerState !== synth.PlayerState.Playing;
+    if (!willStart || !countIn) {
+      m.playPause();
+      return;
+    }
+
+    const bpm = (m.score?.tempo ?? 120) * m.playbackSpeed;
+    const run = startCountIn({
+      beats: countInBeats,
+      bpm,
+      volume: metronome ? metronomeVolume : DEFAULT_METRONOME_VOLUME,
+    });
+    countInRef.current = run;
+    setIsCountingIn(true);
+
+    void run.finished.then(completed => {
+      countInRef.current = null;
+      setIsCountingIn(false);
+      if (completed) m.play();
+    });
+  }, [master, countIn, countInBeats, metronome, metronomeVolume]);
 
   const stop = useCallback(() => {
     const m = master();
     if (!m) return;
+    countInRef.current?.cancel();
+    countInRef.current = null;
+    setIsCountingIn(false);
     m.stop();
     scrollToCursorWhenSettled(m);
     mirrorFollowers(0, true);
@@ -644,6 +708,34 @@ export function TabPlayerProvider({ children }: { children: ReactNode }) {
   const setLoop = useCallback((range: BarRange | null) => setLoopState(range), []);
   const setIsLooping = useCallback((looping: boolean) => setIsLoopingState(looping), []);
 
+  /**
+   * Ctrl+clic sobre un compás: el primero fija un loop de un solo compás y
+   * queda como ancla; el siguiente extiende el rango hasta él. El tercero
+   * vuelve a empezar, de modo que marcar un tramo nuevo nunca obliga a
+   * borrar el anterior.
+   */
+  const loopAnchor = useRef<number | null>(null);
+
+  const toggleLoopBar = useCallback((barIndex: number) => {
+    const bar = Math.max(0, barIndex);
+    setLoopState(() => {
+      const anchor = loopAnchor.current;
+      if (anchor === null) {
+        loopAnchor.current = bar;
+        return { startBar: bar, endBar: bar };
+      }
+      loopAnchor.current = null;
+      return { startBar: Math.min(anchor, bar), endBar: Math.max(anchor, bar) };
+    });
+    setIsLoopingState(true);
+  }, []);
+
+  const clearLoop = useCallback(() => {
+    loopAnchor.current = null;
+    setLoopState(null);
+    setIsLoopingState(false);
+  }, []);
+
   const loopCurrentBar = useCallback(() => {
     const m = master();
     const score = m?.score;
@@ -661,8 +753,27 @@ export function TabPlayerProvider({ children }: { children: ReactNode }) {
     setFretShiftState(clampSemitones(value));
   }, []);
 
-  const setMetronome = useCallback((on: boolean) => setMetronomeState(on), []);
-  const setCountIn = useCallback((on: boolean) => setCountInState(on), []);
+  const setMetronome = useCallback((on: boolean) => {
+    setMetronomeState(on);
+    writePref(PREF_KEYS.metronome, on);
+  }, []);
+
+  const setMetronomeVolume = useCallback((gain: number) => {
+    const clamped = Math.min(MAX_METRONOME_VOLUME, Math.max(0, gain));
+    setMetronomeVolumeState(clamped);
+    writePref(PREF_KEYS.metronomeVolume, clamped);
+  }, []);
+
+  const setCountIn = useCallback((on: boolean) => {
+    setCountInState(on);
+    writePref(PREF_KEYS.countIn, on);
+  }, []);
+
+  const setCountInBeats = useCallback((beats: number) => {
+    const clamped = Math.min(MAX_COUNT_IN_BEATS, Math.max(1, Math.round(beats)));
+    setCountInBeatsState(clamped);
+    writePref(PREF_KEYS.countInBeats, clamped);
+  }, []);
 
   // --- sincronización de estado hacia alphaTab ---
 
@@ -678,13 +789,15 @@ export function TabPlayerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const m = master();
-    if (m) m.metronomeVolume = metronome ? 1 : 0;
-  }, [master, metronome, isReady, file]);
+    if (m) m.metronomeVolume = metronome ? metronomeVolume : 0;
+  }, [master, metronome, metronomeVolume, isReady, file]);
 
   useEffect(() => {
+    // El compás de entrada lo lleva `countIn.ts`, porque el de alphaTab dura
+    // siempre un compás y aquí hace falta poder elegir los clicks.
     const m = master();
-    if (m) m.countInVolume = countIn ? 1 : 0;
-  }, [master, countIn, isReady, file]);
+    if (m) m.countInVolume = 0;
+  }, [master, isReady, file]);
 
   /**
    * Afinación del instrumento: desplaza la altura sonora sin tocar los trastes.
@@ -786,8 +899,15 @@ export function TabPlayerProvider({ children }: { children: ReactNode }) {
 
     metronome,
     setMetronome,
+    metronomeVolume,
+    setMetronomeVolume,
     countIn,
     setCountIn,
+    countInBeats,
+    setCountInBeats,
+    isCountingIn,
+    toggleLoopBar,
+    clearLoop,
 
     positionStore,
     registerPane,

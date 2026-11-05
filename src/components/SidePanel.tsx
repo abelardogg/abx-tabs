@@ -1,6 +1,10 @@
 import { useSyncExternalStore } from 'react';
 import { StringBoard } from './StringBoard';
-import { useTabPlayer } from '../player/TabPlayerProvider';
+import {
+  MAX_COUNT_IN_BEATS,
+  MAX_METRONOME_VOLUME,
+  useTabPlayer,
+} from '../player/TabPlayerProvider';
 import { formatSemitones } from '../lib/tuning';
 import { barIndexFromStarts } from '../lib/bars';
 
@@ -50,8 +54,14 @@ export function SidePanel() {
     tuningFor,
     metronome,
     setMetronome,
+    metronomeVolume,
+    setMetronomeVolume,
     countIn,
     setCountIn,
+    countInBeats,
+    setCountInBeats,
+    isCountingIn,
+    clearLoop,
     loop,
     setLoop,
     isLooping,
@@ -165,6 +175,21 @@ export function SidePanel() {
           />
           <span>Click en cada pulso</span>
         </label>
+        <label className="slider">
+          <span>Volumen</span>
+          <input
+            type="range"
+            min={0}
+            max={MAX_METRONOME_VOLUME}
+            step={0.1}
+            value={metronomeVolume}
+            onChange={e => setMetronomeVolume(Number(e.target.value))}
+            disabled={disabled || !metronome}
+            aria-label="Volumen del metrónomo"
+          />
+          <output>{Math.round(metronomeVolume * 100)}%</output>
+        </label>
+
         <label className="toggle">
           <input
             type="checkbox"
@@ -174,12 +199,26 @@ export function SidePanel() {
           />
           <span>Compás de entrada</span>
         </label>
+        <label className="slider">
+          <span>Clicks</span>
+          <input
+            type="number"
+            min={1}
+            max={MAX_COUNT_IN_BEATS}
+            value={countInBeats}
+            onChange={e => setCountInBeats(Number(e.target.value))}
+            disabled={disabled || !countIn}
+            aria-label="Clicks del compás de entrada"
+          />
+          {isCountingIn && <output className="is-live">sonando…</output>}
+        </label>
       </section>
 
       <section className="side__block">
         <h2>Loop</h2>
         <p className="side__help">
-          También puedes arrastrar sobre la tablatura del panel de audio para marcar el segmento.
+          <kbd>Ctrl</kbd> + clic en un compás lo marca; otro <kbd>Ctrl</kbd> + clic extiende el
+          tramo hasta él. También puedes arrastrar sobre la tablatura. <kbd>Esc</kbd> lo quita.
         </p>
         <label className="toggle">
           <input
@@ -220,10 +259,7 @@ export function SidePanel() {
           </button>
           <button
             type="button"
-            onClick={() => {
-              setLoop(null);
-              setIsLooping(false);
-            }}
+            onClick={clearLoop}
             disabled={disabled || !loop}
           >
             Quitar
@@ -270,6 +306,10 @@ export function SidePanel() {
           <dd>sección anterior / siguiente</dd>
           <dt>↑ ↓</dt>
           <dd>desplazar el panel activo</dd>
+          <dt>Ctrl + clic</dt>
+          <dd>marcar compases del loop</dd>
+          <dt>Esc</dt>
+          <dd>quitar el loop</dd>
         </dl>
       </section>
     </aside>

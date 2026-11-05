@@ -79,12 +79,14 @@ Lo que se guarda es una *referencia* al archivo, nunca su contenido.
 ## Qué hace
 
 - Play, pause, stop, control de posición y de velocidad
-- Loop sobre un segmento de compases, fijándolo a mano o arrastrando sobre la tablatura
+- Loop sobre un segmento de compases: `Ctrl` + clic en un compás lo marca y otro `Ctrl` + clic
+  extiende el tramo; también se puede arrastrar o escribir los compases a mano
 - Split screen vertical de hasta 3 instrumentos, cada uno con su pista y su scroll
 - Cursor de reproducción: compás resaltado, línea sobre el golpe y notas en curso marcadas
 - Rótulo con el nombre de las notas que suenan, encima del compás
 - Panel con todas las cuerdas y la nota que suena en cada una
-- Metrónomo y compás de entrada
+- Metrónomo con volumen regulable y compás de entrada con número de clicks configurable; ambos
+  ajustes se recuerdan entre sesiones
 - Visualización de la afinación del instrumento
 - **Transposición de tono**: afina el instrumento en semitonos. Los trastes de la tablatura no
   cambian; cambia la altura a la que suena.
@@ -99,6 +101,8 @@ Lo que se guarda es una *referencia* al archivo, nunca su contenido.
 | `Ctrl` + `←` `→` | compás anterior / siguiente |
 | `Ctrl` + `←←` `→→` | sección anterior / siguiente (doble pulsación rápida) |
 | `↑` `↓` | desplazar el panel activo |
+| `Ctrl` + clic | marcar compases del loop |
+| `Esc` | quitar el loop |
 
 El panel activo es el último en el que hiciste clic; se marca con una línea en su cabecera.
 
@@ -129,6 +133,16 @@ El primer panel es el maestro: es el único con sintetizador audible y el que ma
 Los paneles seguidores llevan el volumen a cero y nunca reproducen; su cursor se mueve
 posicionándolos en el tick que reporta el maestro. Así hay un solo reloj y un solo sintetizador
 activo por más paneles que se abran.
+
+### Metrónomo y compás de entrada
+
+El click de alphaTab suena bastante más bajo que los instrumentos. Su volumen es una ganancia sin
+tope superior, así que el valor de fábrica es `2` y el control llega hasta `4`.
+
+El compás de entrada no usa el de alphaTab, cuya duración está fijada a un compás
+(`clickCount = timeSignatureNumerator`). Para poder elegir cuántos clicks suenan se sintetiza
+aparte en `src/player/countIn.ts` con Web Audio, y el de alphaTab se deja en silencio para que no
+se dupliquen.
 
 ### Los dos controles de tono
 

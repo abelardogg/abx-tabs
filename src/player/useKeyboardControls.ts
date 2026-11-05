@@ -32,12 +32,14 @@ function isButton(target: EventTarget | null): boolean {
  * - `Ctrl` + `←` `←` o `Ctrl` + `→` `→` (doble pulsación rápida): sección
  *   anterior / siguiente
  * - `↑` `↓`: desplaza verticalmente el panel activo
+ * - `Esc`: quita el loop
  *
  * El salto de sección cuelga de `Ctrl` y no de la flecha sola porque recorrer
  * notas deprisa encadena pulsaciones rápidas, y se dispararía sin querer.
  */
 export function useKeyboardControls(): void {
-  const { playPause, seekBars, seekBeats, jumpSection, activePane, file } = useTabPlayer();
+  const { playPause, seekBars, seekBeats, jumpSection, clearLoop, activePane, file } =
+    useTabPlayer();
   const lastBarStep = useRef<{ key: string; at: number } | null>(null);
 
   useEffect(() => {
@@ -86,6 +88,12 @@ export function useKeyboardControls(): void {
           return;
         }
 
+        case 'Escape': {
+          event.preventDefault();
+          clearLoop();
+          return;
+        }
+
         case 'ArrowUp':
         case 'ArrowDown': {
           if (event.ctrlKey) return;
@@ -108,5 +116,5 @@ export function useKeyboardControls(): void {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [playPause, seekBars, seekBeats, jumpSection, activePane, file]);
+  }, [playPause, seekBars, seekBeats, jumpSection, clearLoop, activePane, file]);
 }
