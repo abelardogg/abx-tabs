@@ -1,0 +1,27 @@
+# Dependencias y artefactos de build
+node_modules/
+dist/
+
+# Assets de alphaTab, copiados desde node_modules por
+# scripts/copy-alphatab-assets.mjs en cada `npm run dev` / `npm run build`
+public/font/
+public/soundfont/
+
+# Tablaturas. El proyecto no almacena tablaturas: ni las del usuario ni las
+# que generan los tests (tests/e2e/fixtures/, que se recrean solas).
+*.gp
+*.gp3
+*.gp4
+*.gp5
+*.gpx
+*.gp7
+TABS/
+
+# Entorno y registros
+.env*
+*.log
+
+# Basura del sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini

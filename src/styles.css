@@ -1,0 +1,717 @@
+/*
+ * Pensado para pantallas de escritorio: la app ocupa el viewport completo y
+ * reparte el ancho entre los paneles de instrumento. No es responsive.
+ */
+
+:root {
+  --bg: #15171c;
+  --bg-raised: #1d2027;
+  --bg-sunken: #0f1115;
+  --paper: #fbfaf7;
+  --line: #2c313b;
+  --text: #e7e9ee;
+  --text-dim: #9aa3b2;
+  --accent: #e0a63c;
+  --accent-soft: rgba(224, 166, 60, 0.16);
+  --danger: #e2685f;
+  --radius: 6px;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.45 'Segoe UI', system-ui, sans-serif;
+}
+
+button {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 4px 9px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+button.is-on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+input[type='number'],
+select {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 3px 6px;
+}
+
+input[type='range'] {
+  accent-color: var(--accent);
+}
+
+h2 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* ---------- estructura ---------- */
+
+.app {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  height: 100%;
+  position: relative;
+}
+
+.app--dragging::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px dashed var(--accent);
+  background: var(--accent-soft);
+  pointer-events: none;
+  z-index: 20;
+}
+
+.app__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  min-height: 0;
+}
+
+.app__panes {
+  display: grid;
+  gap: 1px;
+  background: var(--line);
+  min-height: 0;
+  /* Ancla del dropzone, que se limita a esta zona. */
+  position: relative;
+}
+
+.app__panes[data-count='1'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app__panes[data-count='2'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.app__panes[data-count='3'] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.app__error {
+  margin: 0;
+  padding: 7px 14px;
+  background: rgba(226, 104, 95, 0.15);
+  border-bottom: 1px solid var(--danger);
+  color: #ffd9d5;
+}
+
+.app__footer {
+  border-top: 1px solid var(--line);
+  background: var(--bg-raised);
+}
+
+/* ---------- barra superior ---------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-raised);
+}
+
+.topbar__brand {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.topbar__tagline {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.topbar__file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.topbar__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 420px;
+  color: var(--text-dim);
+}
+
+.topbar__close {
+  padding: 2px 7px;
+}
+
+.topbar__split {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  color: var(--text-dim);
+}
+
+/* ---------- panel de instrumento ---------- */
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg);
+}
+
+.pane__head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-raised);
+}
+
+.pane--active .pane__head {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.pane__badge {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--bg-sunken);
+  color: var(--text-dim);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pane--active .pane__badge {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.pane__track {
+  min-width: 0;
+  flex: 1;
+}
+
+/*
+ * alphaTab dibuja la partitura en negro, así que el lienzo va sobre un fondo
+ * claro tipo papel aunque el resto de la interfaz sea oscura.
+ */
+.pane__viewport {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--paper);
+  position: relative;
+}
+
+.pane__hint {
+  margin: 0;
+  padding: 24px 16px;
+  color: #6b6f78;
+  text-align: center;
+}
+
+.pane__hint--error {
+  color: #a3352c;
+}
+
+/* ---------- panel lateral ---------- */
+
+.side {
+  border-left: 1px solid var(--line);
+  background: var(--bg-raised);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.side__block {
+  padding: 11px 13px;
+  border-bottom: 1px solid var(--line);
+}
+
+.side__subject {
+  margin: 0 0 7px;
+  font-weight: 600;
+}
+
+.side__help,
+.side__note,
+.side__empty {
+  margin: 0 0 8px;
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+
+.side__note {
+  color: var(--accent);
+}
+
+.side__actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.side__block--keys dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 10px;
+  margin: 0;
+  font-size: 11.5px;
+}
+
+.side__block--keys dt {
+  color: var(--accent);
+  font-family: ui-monospace, 'Cascadia Mono', monospace;
+}
+
+.side__block--keys dd {
+  margin: 0;
+  color: var(--text-dim);
+}
+
+/* ---------- cursor de reproducción ---------- */
+
+/*
+ * alphaTab crea estos elementos por su cuenta cuando el player está activo,
+ * pero los deja SIN estilo: existen, se colocan y se mueven solos, y aun así
+ * son invisibles hasta que la aplicación les da color. De ahí que el cursor
+ * no se viera pese a tener `enableCursor` activado.
+ */
+
+/* Compás en curso. */
+.pane__viewport .at-cursor-bar {
+  background: rgba(224, 166, 60, 0.22);
+}
+
+/* Línea vertical sobre el golpe que suena. */
+.pane__viewport .at-cursor-beat {
+  background: #2f6df6;
+  width: 2px;
+}
+
+/* Notas del golpe en curso. */
+.pane__viewport .at-highlight * {
+  fill: #2f6df6;
+  stroke: #2f6df6;
+}
+
+/* ---------- rótulo de notas sobre el compás ---------- */
+
+.pane__surface {
+  position: relative;
+}
+
+/*
+ * Se coloca en coordenadas de la superficie de alphaTab (ver `beatMarker.ts`),
+ * por eso vive dentro de `.pane__surface` y no del viewport: así acompaña a la
+ * partitura al hacer scroll sin tener que recalcular nada.
+ */
+.beatmark {
+  position: absolute;
+  z-index: 2;
+  /* `left`/`top` marcan el golpe y el borde superior del compás; de ahí se
+     centra horizontalmente y se sube para quedar encima del pentagrama. */
+  transform: translate(-50%, -116%);
+  padding: 1px 6px;
+  border-radius: 9px;
+  background: #2f6df6;
+  color: #fff;
+  font-family: ui-monospace, 'Cascadia Mono', monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ---------- cuerdas sonando ---------- */
+
+.board {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.board__row {
+  display: grid;
+  grid-template-columns: 16px 34px 1fr 52px;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 4px;
+  border-radius: 3px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+/* Solo se destaca la cuerda que suena; las demás quedan de fondo. */
+.board__row--on {
+  background: var(--accent-soft);
+}
+
+.board__num {
+  color: var(--text-dim);
+  font-size: 11px;
+  text-align: right;
+}
+
+.board__open {
+  color: var(--text-dim);
+  font-family: ui-monospace, 'Cascadia Mono', monospace;
+  font-size: 11px;
+}
+
+.board__note {
+  font-family: ui-monospace, 'Cascadia Mono', monospace;
+  font-size: 16px;
+  line-height: 1.2;
+  color: var(--accent);
+  /* Altura reservada: sin esto las filas saltan al entrar y salir notas. */
+  min-height: 19px;
+}
+
+.board__fret {
+  color: var(--text);
+  font-size: 11px;
+  text-align: right;
+}
+
+.board__legend {
+  display: grid;
+  grid-template-columns: 16px 34px 1fr 52px;
+  gap: 7px;
+  margin: 5px 0 0;
+  padding: 0 4px;
+  color: var(--text-dim);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.board__legend span:first-child,
+.board__legend span:last-child {
+  text-align: right;
+}
+
+/* ---------- afinación ---------- */
+
+.tuning {
+  list-style: none;
+  margin: 0 0 7px;
+  padding: 0;
+}
+
+.tuning__row {
+  display: grid;
+  grid-template-columns: 18px 44px 1fr;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.tuning__num {
+  color: var(--text-dim);
+  font-size: 11px;
+  text-align: right;
+}
+
+.tuning__note {
+  font-family: ui-monospace, 'Cascadia Mono', monospace;
+  font-size: 14px;
+  color: var(--accent);
+}
+
+.tuning__orig {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.tuning__name {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+
+/* ---------- controles ---------- */
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.stepper output {
+  min-width: 42px;
+  padding: 3px 0;
+  border-radius: var(--radius);
+  background: var(--bg-sunken);
+  font-family: ui-monospace, 'Cascadia Mono', monospace;
+  font-size: 14px;
+  text-align: center;
+}
+
+.stepper output.is-shifted {
+  color: var(--accent);
+}
+
+.stepper__reset {
+  margin-left: auto;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 0;
+  cursor: pointer;
+}
+
+.toggle input {
+  accent-color: var(--accent);
+}
+
+.loopbars {
+  display: flex;
+  gap: 8px;
+  margin-top: 7px;
+}
+
+.loopbars label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+
+.loopbars input {
+  width: 60px;
+}
+
+.sections {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.sections button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 2px;
+  text-align: left;
+  background: transparent;
+  border-color: transparent;
+}
+
+.sections button:hover {
+  background: var(--bg-sunken);
+}
+
+.sections__bar {
+  flex: none;
+  min-width: 22px;
+  color: var(--text-dim);
+  font-size: 11px;
+  text-align: right;
+}
+
+/* ---------- transporte ---------- */
+
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 14px;
+}
+
+.transport__buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.transport__buttons button {
+  min-width: 32px;
+}
+
+.transport__play {
+  min-width: 44px !important;
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.transport__scrub {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1;
+  min-width: 0;
+}
+
+.transport__scrub input {
+  flex: 1;
+  min-width: 0;
+}
+
+.transport__time {
+  font-family: ui-monospace, 'Cascadia Mono', monospace;
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+
+.transport__meta {
+  display: flex;
+  gap: 10px;
+  white-space: nowrap;
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+
+.transport__loading {
+  color: var(--accent);
+}
+
+.transport__speed {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+
+.transport__speed input {
+  width: 110px;
+}
+
+.transport__speed output {
+  min-width: 36px;
+  font-family: ui-monospace, 'Cascadia Mono', monospace;
+  color: var(--text);
+}
+
+.transport__presets {
+  display: flex;
+  gap: 3px;
+}
+
+.transport__presets button {
+  padding: 3px 6px;
+  font-size: 11px;
+}
+
+/* ---------- zona de arrastre ---------- */
+
+/*
+ * Solo cubre el área de la tablatura. Soltar el archivo, en cambio, funciona
+ * en toda la ventana: de eso se encarga `useFileDrop`, que escucha en
+ * `window` y no depende de esta capa.
+ */
+.dropzone {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  background: rgba(21, 23, 28, 0.9);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.dropzone p {
+  margin: 0;
+}
+
+.dropzone p:first-child {
+  font-size: 17px;
+}
+
+.dropzone__formats {
+  color: var(--text-dim);
+  font-family: ui-monospace, 'Cascadia Mono', monospace;
+}
+
+/* La capa del dropzone ignora el puntero para no estorbar al arrastre; los
+   botones lo recuperan solo sobre sí mismos. */
+.dropzone__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  pointer-events: auto;
+}
+
+.dropzone__actions button {
+  padding: 6px 13px;
+}
+
+.topbar__library,
+.dropzone__library {
+  max-width: 260px;
+}
+
+.dropzone__library {
+  padding: 6px 10px;
+}
+
+.topbar__recent {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-dim);
+}
+
+.dropzone__privacy {
+  max-width: 380px;
+  color: var(--text-dim);
+  font-size: 11.5px;
+  text-align: center;
+}

@@ -1,0 +1,25 @@
+services:
+  # Desarrollo: abre http://localhost:5173
+  dev:
+    build:
+      context: .
+      target: dev
+    ports:
+      - "5173:5173"
+    volumes:
+      # El código se monta desde el host para tener hot reload...
+      - .:/app
+      # ...pero node_modules se queda en el contenedor: los binarios nativos
+      # de Vite son de Linux y no sirven los que npm instala en Windows.
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+
+  # Producción local: abre http://localhost:8080
+  prod:
+    build:
+      context: .
+      target: prod
+    ports:
+      - "8080:80"
+    profiles: ["prod"]
