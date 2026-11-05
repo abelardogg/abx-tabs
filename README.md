@@ -106,6 +106,11 @@ Lo que se guarda es una *referencia* al archivo, nunca su contenido.
 
 El panel activo es el último en el que hiciste clic; se marca con una línea en su cabecera.
 
+Los atajos siguen funcionando después de usar un control con el ratón: al accionar una casilla,
+un botón o un deslizador con un clic, el foco vuelve al documento, de modo que `Espacio` pausa en
+vez de volver a conmutar lo último que tocaste. La navegación con `Tab` no se ve afectada: ahí el
+control conserva el foco y `Espacio` lo acciona como es debido.
+
 ## Arquitectura
 
 React 19 + TypeScript + Vite 8, con [alphaTab](https://alphatab.net) encargándose de parsear los
@@ -122,6 +127,8 @@ archivos de Guitar Pro, renderizar la tablatura y sintetizar el audio.
   suena; así cada panel rotula su propio instrumento.
 - `src/player/recentFile.ts` — memoria del último archivo.
 - `src/player/useKeyboardControls.ts`, `src/player/useFileDrop.ts` — teclado y arrastre.
+- `src/player/useReleaseFocus.ts` — suelta el foco de los controles accionados con el ratón, para
+  que los atajos sigan llegando al reproductor.
 - `src/lib/` — cálculos puros: afinación, notas, compases, secciones.
 - `vite/tabsLibraryPlugin.ts` — expone la carpeta `TABS/` como desplegable. Es un plugin **solo
   de desarrollo**: en producción no existe, para que las tablaturas no acaben dentro de una

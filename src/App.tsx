@@ -6,6 +6,7 @@ import { useTabPlayer } from './player/TabPlayerProvider';
 import { pickFile, supportsFileHandles } from './player/recentFile';
 import { useFileDrop } from './player/useFileDrop';
 import { useKeyboardControls } from './player/useKeyboardControls';
+import { useReleaseFocus } from './player/useReleaseFocus';
 
 export function App() {
   const {
@@ -21,6 +22,7 @@ export function App() {
   } = useTabPlayer();
 
   useKeyboardControls();
+  useReleaseFocus();
   const isDragging = useFileDrop(openFile);
 
   // Ver la nota en `TopBar`: la comprobación va antes de cualquier `await`
