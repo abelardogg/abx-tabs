@@ -65,7 +65,7 @@ Hay tres maneras:
 - **Arrastrar** el archivo a cualquier punto de la ventana.
 - **Botón "Abrir archivo"**, que abre el explorador del sistema.
 - **Desplegable "Carpeta TABS"**: deja tus tablaturas en la carpeta `TABS/` del proyecto y
-  aparecen listadas. Solo en modo desarrollo (ver [Arquitectura](#arquitectura)).
+  aparecen listadas. Solo en modo desarrollo (ver [Despliegue](#despliegue)).
 
 El último archivo abierto se recuerda y se intenta cargar al arrancar:
 
@@ -85,8 +85,8 @@ Lo que se guarda es una *referencia* al archivo, nunca su contenido.
 - Cursor de reproducción: compás resaltado, línea sobre el golpe y notas en curso marcadas
 - Rótulo con el nombre de las notas que suenan, encima del compás
 - Panel con todas las cuerdas y la nota que suena en cada una
-- Metrónomo con volumen regulable y compás de entrada con número de clicks configurable; ambos
-  ajustes se recuerdan entre sesiones
+- Metrónomo con volumen regulable y compás de entrada de 4 u 8 clicks; ambos ajustes se
+  recuerdan entre sesiones
 - Visualización de la afinación del instrumento
 - **Transposición de tono**: afina el instrumento en semitonos. Los trastes de la tablatura no
   cambian; cambia la altura a la que suena.
@@ -142,7 +142,9 @@ tope superior, así que el valor de fábrica es `2` y el control llega hasta `4`
 El compás de entrada no usa el de alphaTab, cuya duración está fijada a un compás
 (`clickCount = timeSignatureNumerator`). Para poder elegir cuántos clicks suenan se sintetiza
 aparte en `src/player/countIn.ts` con Web Audio, y el de alphaTab se deja en silencio para que no
-se dupliquen.
+se dupliquen. Las opciones son 4 u 8: un conjunto cerrado en lugar de un número libre, porque un
+campo editable admitía estados intermedios sin sentido (vaciarlo daba 0, y teclear un dígito
+sobre el valor anterior lo concatenaba).
 
 ### Los dos controles de tono
 
@@ -164,6 +166,19 @@ La fuente musical Bravura y el banco de sonidos se copian de `node_modules` a `p
 alphaTab también sabe copiarlos, pero lo hace en un hook que corre después de que el dev server
 indexó `public/`: en el primer arranque los archivos quedaban en disco pero se servían como 404.
 De ahí que la copia sea un paso previo explícito.
+
+## Despliegue
+
+El build es estático (`npm run build` → `dist/`), así que sirve cualquier alojamiento de sitios
+estáticos. En Vercel no hace falta configuración: detecta Vite y usa ese comando y esa carpeta.
+
+El desplegable de la carpeta `TABS/` **no aparece en producción**. Lo alimenta un plugin de Vite
+que solo corre en el dev server, y la petición se elimina del bundle al compilar
+(`import.meta.env.DEV`), de modo que un despliegue no la intenta ni deja un 404 en la consola.
+Las tablaturas tampoco viajan: `TABS/` está en `.gitignore` y en `.dockerignore`.
+
+Allí quedan las otras dos formas de abrir un archivo, que funcionan igual: arrastrarlo o
+buscarlo en el equipo.
 
 ## Verificación
 

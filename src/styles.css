@@ -538,6 +538,26 @@ h2 {
   color: var(--accent);
 }
 
+.radios {
+  display: flex;
+  gap: 10px;
+}
+
+.radios__item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.radios__item input {
+  accent-color: var(--accent);
+}
+
+.radios__item input:disabled + span {
+  opacity: 0.4;
+}
+
 kbd {
   padding: 0 3px;
   border: 1px solid var(--line);

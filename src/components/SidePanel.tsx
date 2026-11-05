@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { StringBoard } from './StringBoard';
 import {
-  MAX_COUNT_IN_BEATS,
+  COUNT_IN_OPTIONS,
   MAX_METRONOME_VOLUME,
   useTabPlayer,
 } from '../player/TabPlayerProvider';
@@ -199,19 +199,25 @@ export function SidePanel() {
           />
           <span>Compás de entrada</span>
         </label>
-        <label className="slider">
+        <div className="slider" role="radiogroup" aria-label="Clicks del compás de entrada">
           <span>Clicks</span>
-          <input
-            type="number"
-            min={1}
-            max={MAX_COUNT_IN_BEATS}
-            value={countInBeats}
-            onChange={e => setCountInBeats(Number(e.target.value))}
-            disabled={disabled || !countIn}
-            aria-label="Clicks del compás de entrada"
-          />
+          <div className="radios">
+            {COUNT_IN_OPTIONS.map(option => (
+              <label key={option} className="radios__item">
+                <input
+                  type="radio"
+                  name="count-in-beats"
+                  value={option}
+                  checked={countInBeats === option}
+                  onChange={() => setCountInBeats(option)}
+                  disabled={disabled || !countIn}
+                />
+                <span>{option}</span>
+              </label>
+            ))}
+          </div>
           {isCountingIn && <output className="is-live">sonando…</output>}
-        </label>
+        </div>
       </section>
 
       <section className="side__block">

@@ -35,8 +35,20 @@ export const MAX_PANES = 3;
  */
 export const DEFAULT_METRONOME_VOLUME = 2;
 export const MAX_METRONOME_VOLUME = 4;
+/**
+ * Opciones de compás de entrada. Son un conjunto cerrado y no un número libre:
+ * un campo numérico editable se prestaba a estados intermedios absurdos
+ * (vaciarlo daba 0, y teclear un dígito sobre el valor anterior lo concatenaba).
+ */
+export const COUNT_IN_OPTIONS = [4, 8] as const;
 export const DEFAULT_COUNT_IN_BEATS = 4;
-export const MAX_COUNT_IN_BEATS = 16;
+
+/** Ajusta cualquier valor guardado a una de las opciones admitidas. */
+function normalizeCountInBeats(value: number): number {
+  return COUNT_IN_OPTIONS.includes(value as (typeof COUNT_IN_OPTIONS)[number])
+    ? value
+    : DEFAULT_COUNT_IN_BEATS;
+}
 /** El primer panel es siempre el que manda: es el único que sintetiza audio. */
 export const MASTER_PANE = 0;
 
@@ -212,7 +224,9 @@ export function TabPlayerProvider({ children }: { children: ReactNode }) {
   );
   const [countIn, setCountInState] = useState(() => readBoolean(PREF_KEYS.countIn, false));
   const [countInBeats, setCountInBeatsState] = useState(() =>
-    readNumber(PREF_KEYS.countInBeats, DEFAULT_COUNT_IN_BEATS, 1, MAX_COUNT_IN_BEATS),
+    normalizeCountInBeats(
+      readNumber(PREF_KEYS.countInBeats, DEFAULT_COUNT_IN_BEATS, 1, Number.MAX_SAFE_INTEGER),
+    ),
   );
   const [isCountingIn, setIsCountingIn] = useState(false);
   const countInRef = useRef<CountIn | null>(null);
@@ -392,14 +406,29 @@ export function TabPlayerProvider({ children }: { children: ReactNode }) {
   );
 
   /**
-   * El listado lo sirve un plugin que solo existe en desarrollo; en el build
-   * de producción no responde y la biblioteca queda simplemente vacía.
+   * El listado lo sirve un plugin que solo existe en desarrollo, así que en
+   * cualquier despliegue estático (nginx, Vercel...) no hay nada que listar y
+   * la biblioteca queda vacía, con lo que el desplegable no se muestra.
+   *
+   * Se comprueba el tipo de contenido además del código de estado: un
+   * alojamiento con reescritura a `index.html` responde 200 con HTML a
+   * cualquier ruta desconocida, y conviene descartarlo explícitamente en vez
+   * de confiar en que `json()` reviente.
    */
   useEffect(() => {
+    // En producción el endpoint no existe: pedirlo solo dejaría un 404 en la
+    // consola del navegador. Vite resuelve esta condición al compilar, así
+    // que la petición ni siquiera llega al bundle desplegado.
+    if (!import.meta.env.DEV) return;
+
     let cancelled = false;
     fetch('/__tabs/list')
-      .then(response => (response.ok ? response.json() : null))
-      .then((data: { files?: LibraryEntry[] } | null) => {
+      .then(response => {
+        const type = response.headers.get('content-type') ?? '';
+        if (!response.ok || !type.includes('application/json')) return null;
+        return response.json() as Promise<{ files?: LibraryEntry[] }>;
+      })
+      .then(data => {
         if (!cancelled && Array.isArray(data?.files)) setLibrary(data.files);
       })
       .catch(() => {
@@ -770,9 +799,9 @@ export function TabPlayerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setCountInBeats = useCallback((beats: number) => {
-    const clamped = Math.min(MAX_COUNT_IN_BEATS, Math.max(1, Math.round(beats)));
-    setCountInBeatsState(clamped);
-    writePref(PREF_KEYS.countInBeats, clamped);
+    const option = normalizeCountInBeats(beats);
+    setCountInBeatsState(option);
+    writePref(PREF_KEYS.countInBeats, option);
   }, []);
 
   // --- sincronización de estado hacia alphaTab ---
